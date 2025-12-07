@@ -1,0 +1,14 @@
+Untuk Spreadsheet Database Produk
+Kolom A = SKU Produk
+Kolom B = Nama Produk
+Kolom C = ID Drive
+
+Untuk Spreadsheet Log Arsip
+Kolom A = Timestamp Masuk
+Kolom B = Nomor Pesanan
+Kolom C = Nama Pembeli
+Kolom D = Nomor HP
+Kolom E = Alamat Email
+Kolom F = SKU Produk
+Kolom G = Status Pengiriman
+Kolom H = Timestamp Selesai
