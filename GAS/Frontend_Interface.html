@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <title>Jarsix Gallery WebApps Admin</title>
+  <style>
+    /* ... (CSS tetap sama seperti sebelumnya) ... */
+    body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px; }
+    .container { max-width: 800px; margin: auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    h2 { color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+    .menu-bar { display: flex; justify-content: center; margin-bottom: 25px; }
+    /* Hanya satu tombol, jadi flex center tetap bekerja */
+    .menu-bar button { padding: 10px 20px; margin: 0 10px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; transition: background-color 0.3s; }
+    .menu-bar .active { background-color: #007AFF; color: white; }
+    .menu-bar button:not(.active):hover { background-color: #e0e0e0; }
+    .content-section { border: 1px solid #ddd; padding: 20px; border-radius: 5px; }
+    label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+    input[type="text"], input[type="email"] { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    .product-input-group { display: flex; align-items: flex-start; margin-bottom: 10px; }
+    .product-input-group input { flex-grow: 1; margin-right: 10px; }
+    .product-list-container { margin-bottom: 20px; padding: 10px; border: 1px dashed #ccc; border-radius: 4px; }
+    .product-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; }
+    .product-item:last-child { border-bottom: none; }
+    .btn-remove { background-color: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+    .btn-action { background-color: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; width: 100%; transition: background-color 0.3s; }
+    .btn-action:hover { background-color: #218838; }
+    .loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.8); z-index: 999; text-align: center; padding-top: 20%; font-size: 24px; }
+    #result-container { margin-top: 20px; padding: 15px; background-color: #e9ecef; border-radius: 4px; }
+    .success { color: green; font-weight: bold; }
+    .fail { color: red; font-weight: bold; }
+
+    /* ========================================================= */
+    /* RESPONSIVE CSS */
+    /* ========================================================= */
+
+    @media screen and (max-width: 600px) {
+      /* 1. Kontainer: Atur ulang margin dan padding */
+      .container {
+        padding: 15px;
+        margin: 0 5px;
+      }
+
+      /* 2. Menu Bar: Ubah dari baris ke tumpukan vertikal */
+      .menu-bar {
+        flex-direction: column;
+      }
+      
+      .menu-bar button {
+        margin: 5px 0;
+        width: 100%;
+      }
+
+      /* 3. Input dan Tombol: Pastikan lebar penuh */
+      input[type="text"], textarea, button:not(.menu-bar button) {
+        width: 100% !important;
+        box-sizing: border-box;
+      }
+      
+      /* 4. Tab Content: Sesuaikan padding */
+      .content-section {
+        padding: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Aplikasi Admin Pengiriman Jarsix Gallery</h2>
+  
+  <div class="menu-bar">
+    <button id="menu-input" class="active" onclick="showSection('input')">Input Data Kirim</button>
+  </div>
+  
+  <div id="input-section" class="content-section">
+    <form id="delivery-form">
+      <label for="nomor_pesanan">Nomor Pesanan</label>
+      <input type="text" id="nomor_pesanan" name="nomor_pesanan" required placeholder="Contoh: 251204FNUTA65U">
+      
+      <label for="alamat_pengiriman">Alamat Pengiriman (Mentah)</label>
+      <input type="text" id="alamat_pengiriman" name="alamat_pengiriman" required placeholder="Nama/Konter 62812... Alamat Lengkap...">
+
+      <label for="email_pembeli">Alamat Email Pembeli</label>
+      <input type="email" id="email_pembeli" name="email_pembeli" required placeholder="contoh@gmail.com">
+      
+      <hr style="margin: 20px 0;">
+      
+      <label>Input Produk yang Dibeli</label>
+      <div class="product-input-group">
+        <input type="text" id="search-product" placeholder="Cari Kode atau Nama Produk (min 3 karakter)">
+        <button type="button" class="btn-action" style="width: 150px; background-color: #007AFF;" onclick="searchAndAddProduct()">Cari & Tambah</button>
+      </div>
+      
+      <div id="product-search-results" class="product-list-container" style="display: none;">
+        </div>
+      
+      <p style="font-weight: bold; margin-top: 20px;">Produk yang Akan Diproses (Kuantitas = 1)</p>
+      <div id="selected-products-container" class="product-list-container">
+        </div>
+      
+      <button type="submit" class="btn-action" id="submit-button">Proses & Kirim</button>
+    </form>
+  </div>
+  
+  <div id="result-display" style="display: none;">
+    </div>
+  
+</div>
+
+<div class="loading-overlay" id="loading">
+  Memproses Pesanan... Mohon Tunggu.
+</div>
+
+<script>
+  let selectedProducts = [];
+  // *** GANTI DENGAN LINK ARSIP GOOGLE SITE ANDA ***
+  const LOG_ARSIP_LINK = "PASTIKAN_LINK_GOOGLESITE_ANDA_DI_SINI"; 
+  
+  // Hanya ada satu section, fungsi ini disederhanakan
+  function showSection(sectionId) {
+    document.getElementById('input-section').style.display = 'block';
+    document.getElementById('result-display').style.display = 'none'; 
+    document.getElementById('menu-input').classList.add('active');
+  }
+
+  // Fungsi untuk tombol "Kembali"
+  function goBackToInput() {
+      document.getElementById('result-display').style.display = 'none';
+      document.getElementById('input-section').style.display = 'block';
+      document.getElementById('menu-input').classList.add('active');
+  }
+  
+  // ==========================================================
+  // INPUT DATA KIRIM LOGIC (AJAX CALLS)
+  // ==========================================================
+  
+  function searchAndAddProduct() {
+    const keyword = document.getElementById('search-product').value.trim();
+    if (keyword.length < 3) {
+      alert("Masukkan minimal 3 karakter untuk mencari produk.");
+      return;
+    }
+
+    document.getElementById('loading').style.display = 'block';
+
+    google.script.run
+      .withSuccessHandler(showSearchResults)
+      .withFailureHandler(handleError)
+      .searchProductsFromDb(keyword);
+  }
+
+  function showSearchResults(products) {
+    document.getElementById('loading').style.display = 'none';
+    const resultsContainer = document.getElementById('product-search-results');
+    resultsContainer.innerHTML = '';
+
+    if (products.length === 0) {
+      resultsContainer.style.display = 'block';
+      resultsContainer.innerHTML = '<p>Produk tidak ditemukan.</p>';
+      return;
+    }
+    
+    resultsContainer.style.display = 'block';
+    products.forEach((product) => {
+      // Pastikan semua properti ada sebelum dipakai
+      if (!product.kode || !product.nama || !product.fileId || !product.type) return;
+
+      const isSelected = selectedProducts.some(p => p.kode === product.kode);
+      const itemDiv = document.createElement('div');
+      itemDiv.classList.add('product-item');
+      
+      // Amankan string untuk dimasukkan ke fungsi JS
+      const safeKode = product.kode.toString().replace(/'/g, "\\'");
+      const safeNama = product.nama.toString().replace(/'/g, "\\'");
+      const safeFileId = product.fileId.toString().replace(/'/g, "\\'");
+      const safeType = product.type.toString().replace(/'/g, "\\'");
+
+      itemDiv.innerHTML = `
+        <span>${product.kode} - ${product.nama}</span>
+        <button type="button" class="btn-action" style="width: 80px; background-color: ${isSelected ? '#6c757d' : '#17a2b8'};" 
+          onclick="selectProduct('${safeKode}', '${safeNama}', '${safeFileId}', '${safeType}', this)"
+          ${isSelected ? 'disabled' : ''}>
+          ${isSelected ? 'Sudah Ditambah' : 'Tambah'}
+        </button>
+      `;
+      resultsContainer.appendChild(itemDiv);
+    });
+  }
+  
+  function selectProduct(kode, nama, fileId, type, buttonElement) {
+    const product = { kode, nama, fileId, type };
+    selectedProducts.push(product);
+    
+    renderSelectedProducts();
+    
+    buttonElement.disabled = true;
+    buttonElement.style.backgroundColor = '#6c757d';
+    buttonElement.textContent = 'Sudah Ditambah';
+  }
+
+  function removeProduct(kode) {
+    selectedProducts = selectedProducts.filter(p => p.kode !== kode);
+    
+    renderSelectedProducts();
+    
+    // Aktifkan kembali tombol di hasil pencarian
+    const searchResultButtons = document.querySelectorAll('#product-search-results .product-item button');
+    searchResultButtons.forEach(button => {
+      if (button.textContent.includes(kode)) {
+        button.disabled = false;
+        button.style.backgroundColor = '#17a2b8';
+        button.textContent = 'Tambah';
+      }
+    });
+  }
+
+  function renderSelectedProducts() {
+    const container = document.getElementById('selected-products-container');
+    container.innerHTML = '';
+    
+    if (selectedProducts.length === 0) {
+      container.innerHTML = '<p style="color: #6c757d;">Belum ada produk yang dipilih.</p>';
+      return;
+    }
+    
+    selectedProducts.forEach((product, index) => {
+      const itemDiv = document.createElement('div');
+      itemDiv.classList.add('product-item');
+      const safeKode = product.kode.toString().replace(/'/g, "\\'");
+
+      itemDiv.innerHTML = `
+        <span>${index + 1}. <strong>${product.nama}</strong> (${product.kode})</span>
+        <button type="button" class="btn-remove" onclick="removeProduct('${safeKode}')">Hapus</button>
+      `;
+      container.appendChild(itemDiv);
+    });
+  }
+
+  document.getElementById('delivery-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    if (selectedProducts.length === 0) {
+      alert("Mohon pilih setidaknya satu produk untuk diproses.");
+      return;
+    }
+
+    document.getElementById('loading').style.display = 'block';
+    const submitButton = document.getElementById('submit-button');
+    submitButton.disabled = true;
+    submitButton.textContent = 'Sedang Mengirim...';
+    
+    // Persiapkan data
+    const formData = new FormData(this);
+    const data = {};
+    formData.forEach((value, key) => { data[key] = value; });
+    
+    // Tambahkan list produk dalam format JSON string
+    data.produk_list = JSON.stringify(selectedProducts);
+
+    // Panggil fungsi kustom handleDataSubmission
+    google.script.run
+      .withSuccessHandler(showProcessResult)
+      .withFailureHandler(handleError)
+      .handleDataSubmission(data); 
+  });
+
+  function showProcessResult(htmlOutput) {
+    document.getElementById('loading').style.display = 'none';
+    const submitButton = document.getElementById('submit-button');
+    submitButton.disabled = false;
+    submitButton.textContent = 'Proses & Kirim';
+    
+    // *** KOREKSI: MENGHAPUS ${htmlOutput} ***
+    const resultDisplay = document.getElementById('result-display');
+    
+    resultDisplay.innerHTML = `
+        <div style="text-align: center; padding: 30px; border: 2px solid #28a745; border-radius: 8px; background-color: #f0fff0; margin-bottom: 20px;">
+            <h3 style="color: #28a745; margin-top: 0;">✅ Data Berhasil Diproses & Email Terkirim!</h3>
+            <p>
+                Cek <a href="${LOG_ARSIP_LINK}" target="_blank" style="color: #007AFF; font-weight: bold; text-decoration: none;">Arsip Log</a> 
+                untuk melihat data yang tersimpan di spreadsheet.
+            </p>
+            <button type="button" class="btn-action" 
+                style="background-color: #6c757d; width: 200px; margin-top: 20px;"
+                onclick="goBackToInput()">
+                Kembali ke Input
+            </button>
+        </div>
+    `;
+    // ****************************************
+    
+    // Sembunyikan form input dan hasil pencarian
+    document.getElementById('input-section').style.display = 'none';
+    document.getElementById('product-search-results').style.display = 'none';
+    document.getElementById('result-display').style.display = 'block';
+    
+    // Reset form
+    document.getElementById('delivery-form').reset();
+    selectedProducts = [];
+    renderSelectedProducts();
+  }
+  
+  // ==========================================================
+  // UTILITY
+  // ==========================================================
+  
+  function handleError(error) {
+    document.getElementById('loading').style.display = 'none';
+    alert("Terjadi kesalahan: " + error.message);
+    const submitButton = document.getElementById('submit-button');
+    if(submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = 'Proses & Kirim';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', renderSelectedProducts);
+
+</script>
+
+</body>
+</html>
